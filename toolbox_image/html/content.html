@@ -1,0 +1,438 @@
+
+<!DOCTYPE html
+  PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN">
+<html xmlns:mwsh="http://www.mathworks.com/namespace/mcode/v1/syntaxhighlight.dtd">
+   <head>
+      <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+   
+      <!--
+This HTML is auto-generated from an M-file.
+To make changes, update the M-file and republish this document.
+      -->
+      <title>Toolox Image - A Toolbox for General Purpose Image Processing</title>
+      <meta name="generator" content="MATLAB 7.4">
+      <meta name="date" content="2008-08-29">
+      <meta name="m-file" content="content">
+      <LINK REL="stylesheet" HREF="style.css" TYPE="text/css">
+   </head>
+   <body>
+      <div class="content">
+         <h1>Toolox Image - A Toolbox for General Purpose Image Processing</h1>
+         <introduction>
+            <p>Copyright (c) 2008 Gabriel Peyre</p>
+         </introduction>
+         <h2>Contents</h2>
+         <div>
+            <ul>
+               <li><a href="#3">Image loading and displaying</a></li>
+               <li><a href="#6">Image Manipulation</a></li>
+               <li><a href="#10">Image Registration</a></li>
+               <li><a href="#13">Spacially varying filter</a></li>
+               <li><a href="#17">Median Filtering</a></li>
+               <li><a href="#18">Line integral convolution</a></li>
+               <li><a href="#21">TV denoising</a></li>
+            </ul>
+         </div>
+         <p>The toolbox can be downloaded from Matlab Central <a href="http://www.mathworks.com/matlabcentral/fileexchange/loadFile.do?objectId=16201&amp;objectType=FILE">http://www.mathworks.com/matlabcentral/fileexchange/loadFile.do?objectId=16201&amp;objectType=FILE</a></p>
+         <p>This includes in the path some additional useful scripts.</p><pre class="codeinput">path(path, <span class="string">'toolbox/'</span>);
+</pre><h2>Image loading and displaying<a name="3"></a></h2>
+         <p>The <tt>load_image</tt> function contains several synthetic examples and can also load arbitrary images. You can provide the size of the image, and
+            you can load batch of images using cell arrays. Optional parameters for the synthetic images are given using the <tt>options</tt> field.
+         </p><pre class="codeinput">options.radius = .3;
+namelist = {<span class="string">'lena'</span> <span class="string">'disk'</span> <span class="string">'chessboard'</span> <span class="string">'phantom'</span>};
+Mlist = load_image(namelist, 256, options);
+</pre><p>The <tt>imageplot</tt> function allows to display sets of images together and link the axes. It handles color images.
+         </p><pre class="codeinput">clf;
+imageplot(Mlist,namelist, 2,2);
+</pre><img vspace="5" hspace="5" src="content_01.png"> <h2>Image Manipulation<a name="6"></a></h2><pre>You can rotate an image.</pre><pre class="codeinput">M = load_image(<span class="string">'lena'</span>, 256);
+Mlist = {};
+<span class="keyword">for</span> i=1:6
+    Mlist{end+1} = perform_image_rotation(M,i*pi/8);
+<span class="keyword">end</span>
+imageplot(Mlist);
+</pre><img vspace="5" hspace="5" src="content_02.png"> <p>You can (gaussian) blur an image.</p><pre class="codeinput">M = load_image(<span class="string">'lena'</span>, 256);
+Mlist = {};
+<span class="keyword">for</span> i=1:6
+    Mlist{end+1} = perform_blurring(M,i*4);
+<span class="keyword">end</span>
+imageplot(Mlist);
+</pre><img vspace="5" hspace="5" src="content_03.png"> <p>You can crop and resize images.</p><pre class="codeinput">M = load_image(<span class="string">'lena'</span>);
+M = crop(M,32);
+Mi = perform_image_resize(M,[256 256]);
+clf; imageplot({M Mi}, {<span class="string">'Original'</span> <span class="string">'Interpolated'</span>});
+</pre><img vspace="5" hspace="5" src="content_04.png"> <h2>Image Registration<a name="10"></a></h2>
+         <p>You can perform image registration by first selecting two points on the image (here using clicking).</p><pre class="codeinput">M = load_image(<span class="string">'barb'</span>);
+<span class="comment">% extract the eyes</span>
+clf; imagesc([0,1],[0,1],M);
+title(<span class="string">'Click on each eye'</span>);
+colormap <span class="string">gray(256)</span>;
+axis <span class="string">image</span>; axis <span class="string">off</span>;
+[x,y,b] = ginput(2);
+</pre><img vspace="5" hspace="5" src="content_05.png"> <p>Then a similitude is applied to register the eye position.</p><pre class="codeinput"><span class="comment">% position of the eye</span>
+u = [x(1) y(1)];
+v = [x(2) y(2)];
+<span class="comment">% target position</span>
+u1 = [0.3,0.3];
+v1 = [0.7,0.3];
+<span class="comment">% registration</span>
+M1 = perform_image_similitude(M,u,u1,v,v1);
+<span class="comment">% display</span>
+clf; imageplot({M M1}, {<span class="string">'Original'</span> <span class="string">'Registered'</span>});
+</pre><img vspace="5" hspace="5" src="content_06.png"> <h2>Spacially varying filter<a name="13"></a></h2>
+         <p>You can provide a set of filters, and for each pixel decide which filter to use (for instance according to local image information).
+            The code is implemented with a mex C code, so it is quite fast. Here we show a simple foveated filtering, where the blurring
+            is stronger in the center of the image.
+         </p><pre class="codeinput">n = 256;
+M = load_image(<span class="string">'lena'</span>, n);
+</pre><p>We first create the set of filters</p><pre class="codeinput">m = 41; <span class="comment">% width of filers</span>
+p = 20; <span class="comment">% number of filters</span>
+sigma = linspace(0.05,10,p);
+H = zeros(m,m,p);
+<span class="keyword">for</span> i=1:p
+    H(:,:,i) = compute_gaussian_filter([m m],sigma(i)/n,[n n]);
+<span class="keyword">end</span>
+</pre><p>Then we compute an index map that tells which filter to use (foveation effect).</p><pre class="codeinput">x = linspace(-1,1,n);
+[Y,X] = meshgrid(x,x);
+R = sqrt(X.^2 + Y.^2);
+I = round(rescale(R,1,p));
+</pre><p>At last, we launch the filtering, and display the result.</p><pre class="codeinput">M1 = perform_adaptive_filtering(M,H,I);
+imageplot({M M1},{<span class="string">'Original'</span> <span class="string">'Foveated'</span>});
+</pre><img vspace="5" hspace="5" src="content_07.png"> <h2>Median Filtering<a name="17"></a></h2>
+         <p>Median filter is effective to remove salt and pepper impulse noise.</p><pre class="codeinput">n = 256;
+M = load_image(<span class="string">'lena'</span>);
+M = rescale(crop(M, n));
+<span class="comment">% add noise at random locations</span>
+r = .3;  <span class="comment">% 30% location corrupted</span>
+I = randperm(n^2); I = I(1:round(r*end));
+M(I) = rand(size(I));
+<span class="comment">% do the filtering</span>
+M1 = perform_median_filtering(M,2);
+<span class="comment">% display</span>
+imageplot({M M1}, {<span class="string">'Original'</span> <span class="string">'Filtered'</span>});
+</pre><img vspace="5" hspace="5" src="content_08.png"> <h2>Line integral convolution<a name="18"></a></h2>
+         <p>The LIC algorithm filters an image along a vector field.</p>
+         <p>create a vector field (this is done using the functions of the diffc toolbox).</p><pre class="codeinput">n = 256;    <span class="comment">% size of the image</span>
+sigma = 60; <span class="comment">% regularity of the vector field</span>
+options.bound = <span class="string">'sym'</span>; <span class="comment">% boundary handling</span>
+v = perform_blurring(randn(n,n,2), sigma, options);
+v = perform_vf_normalization(v);
+</pre><p>Now we perform the LIC of an initial noise image along the flow.</p><pre class="codeinput">M = randn(n);
+<span class="comment">% parameters for the LIC</span>
+options.histogram = <span class="string">'linear'</span>; <span class="comment">% keep contrast fixed</span>
+options.verb = 0;
+options.dt = 1.5; <span class="comment">% time steping</span>
+<span class="comment">% size of the features</span>
+options.flow_correction = 1;
+options.niter_lic = 2; <span class="comment">% several iterations gives better results</span>
+<span class="comment">% iterated lic</span>
+Mlist = {};
+<span class="keyword">for</span> i=1:4
+    options.M0 = M;
+    Mlist{end+1} = perform_lic(v, i*4, options);
+<span class="keyword">end</span>
+<span class="comment">% display</span>
+clf; imageplot(Mlist,<span class="string">''</span>,2,2);
+</pre><img vspace="5" hspace="5" src="content_09.png"> <h2>TV denoising<a name="21"></a></h2>
+         <p>The Sparsity Toolbox implements TV denoising, that minimizes the total variation of the image.</p>
+         <p><tt>argmin_f |F-f</tt>^2 + 2*lambda*TV(f)|
+         </p>
+         <p>Where <tt>F</tt> is the noisy image and <tt>f</tt> is the optimized denoised image. <tt>TV(f)</tt> is the discrete total variation of the image. <tt>lambda</tt> controls how much denoising you want to perform.
+         </p>
+         <p>It corresponds to the Rudin/Osher/Fatemi image denoiser (lagrangian formulation), and works well for images with strong edges
+            (otherwise, wavelets performs better). The TV minimization is performed using the iterative fixed point algorihtm of Chambolle
+            (published in JMIV 2002). A nice feature of the algorithm is that you can give him the target residual value (norm of the
+            noise) in <tt>options.etgt</tt> and it will track it for you during the iterations, and will automatically select the correct <tt>lambda</tt> value.
+         </p>
+         <p>First we load and image and make some noise.</p><pre class="codeinput">n = 128;
+M0 = load_image(<span class="string">'lena'</span>,256);
+M0 = rescale(crop(M0,n));
+sigma = .1;
+M = M0 + randn(size(M0))*sigma;
+<span class="comment">% display</span>
+clf; imageplot({clamp(M0) clamp(M)},{<span class="string">'Original'</span> <span class="string">'Noisy'</span>});
+</pre><img vspace="5" hspace="5" src="content_10.png"> <p>We set the target residual error <tt>options.etgt</tt> just little larger than the noise level <tt>n*sigma</tt>, and run the algorithm.
+         </p><pre class="codeinput"><span class="comment">% some parameter for the algorithm</span>
+options.verb = 0;
+options.display = 0;
+options.niter = 300;    <span class="comment">% number of iterations</span>
+options.etgt = 1.1*sigma*n;
+options.lambda = .3; <span class="comment">% initial regularization</span>
+<span class="comment">% now we perform the denoising</span>
+[Mtv,err,tv,lambda] = perform_tv_denoising(M,options);
+</pre><p>We display the result.</p><pre class="codeinput">clf; imageplot({clamp(M) clamp(Mtv)},{<span class="string">'Noisy'</span> <span class="string">'TV Denoised'</span>});
+</pre><img vspace="5" hspace="5" src="content_11.png"> <p>We can keep track of the decay of <tt>lambda</tt> during the iteration and the Lagrangian decay.
+         </p><pre class="codeinput">clf;
+subplot(2,1,1);
+h = plot(lambda); axis <span class="string">tight</span>;
+set(h, <span class="string">'LineWidth'</span>, 2);
+set(gca, <span class="string">'FontSize'</span>, 20);
+title(<span class="string">'Evolution of \lambda'</span>);
+subplot(2,1,2);
+lagr = .5*err.^2 + lambda(end)*tv;
+h = plot(lagr); axis <span class="string">tight</span>;
+set(h, <span class="string">'LineWidth'</span>, 2);
+set(gca, <span class="string">'FontSize'</span>, 20);
+title(<span class="string">'Evolution of |y-U x|^2+\lambda |x|_1'</span>);
+axis([1 options.niter min(lagr) min(lagr)*1.3]);
+</pre><img vspace="5" hspace="5" src="content_12.png"> <p class="footer"><br>
+            Copyright  &reg; 2008 Gabriel Peyre<br></p>
+      </div>
+      <!--
+##### SOURCE BEGIN #####
+%% Toolox Image - A Toolbox for General Purpose Image Processing
+%
+% Copyright (c) 2008 Gabriel Peyre
+%
+
+%% 
+% The toolbox can be downloaded from Matlab Central
+% http://www.mathworks.com/matlabcentral/fileexchange/loadFile.do?objectId=16201&objectType=FILE
+
+%%
+% This includes in the path some additional useful scripts.
+path(path, 'toolbox/');
+
+%% Image loading and displaying
+
+%%
+% The |load_image| function contains several synthetic examples and can
+% also load arbitrary images. You can provide the size of the image, and
+% you can load batch of images using cell arrays. Optional parameters for
+% the synthetic images are given using the |options| field.
+
+options.radius = .3;
+namelist = {'lena' 'disk' 'chessboard' 'phantom'};
+Mlist = load_image(namelist, 256, options);
+
+%%
+% The |imageplot| function allows to display sets of images together and
+% link the axes. It handles color images.
+
+clf;
+imageplot(Mlist,namelist, 2,2);
+
+%% Image Manipulation
+
+
+%%
+%  You can rotate an image.
+
+M = load_image('lena', 256);
+Mlist = {};
+for i=1:6
+    Mlist{end+1} = perform_image_rotation(M,i*pi/8);
+end
+imageplot(Mlist);
+
+%% 
+% You can (gaussian) blur an image.
+
+M = load_image('lena', 256);
+Mlist = {};
+for i=1:6
+    Mlist{end+1} = perform_blurring(M,i*4);
+end
+imageplot(Mlist);
+
+%%
+% You can crop and resize images.
+
+M = load_image('lena');
+M = crop(M,32);
+Mi = perform_image_resize(M,[256 256]);
+clf; imageplot({M Mi}, {'Original' 'Interpolated'});
+
+
+%% Image Registration
+
+%%
+% You can perform image registration by first selecting two points on the image
+% (here using clicking).
+
+M = load_image('barb');
+% extract the eyes
+clf; imagesc([0,1],[0,1],M);
+title('Click on each eye');
+colormap gray(256);
+axis image; axis off;
+[x,y,b] = ginput(2);
+
+
+%%
+% Then a similitude is applied to register the eye position.
+
+% position of the eye
+u = [x(1) y(1)];
+v = [x(2) y(2)];
+% target position
+u1 = [0.3,0.3];
+v1 = [0.7,0.3];
+% registration
+M1 = perform_image_similitude(M,u,u1,v,v1);
+% display
+clf; imageplot({M M1}, {'Original' 'Registered'});
+
+
+
+
+%% Spacially varying filter
+% You can provide a set of filters, and for each pixel decide which filter
+% to use (for instance according to local image information). The code is implemented with 
+% a mex C code, so it is quite fast. Here we show
+% a simple foveated filtering, where the blurring is stronger in the center
+% of the image.
+
+n = 256;
+M = load_image('lena', n);
+
+%%
+% We first create the set of filters
+m = 41; % width of filers
+p = 20; % number of filters
+sigma = linspace(0.05,10,p);
+H = zeros(m,m,p);
+for i=1:p
+    H(:,:,i) = compute_gaussian_filter([m m],sigma(i)/n,[n n]);
+end
+
+
+%%
+% Then we compute an index map that tells which filter to use (foveation effect).
+x = linspace(-1,1,n);
+[Y,X] = meshgrid(x,x);
+R = sqrt(X.^2 + Y.^2);
+I = round(rescale(R,1,p));
+
+%%
+% At last, we launch the filtering, and display the result.
+
+M1 = perform_adaptive_filtering(M,H,I);
+imageplot({M M1},{'Original' 'Foveated'});
+
+
+%% Median Filtering
+% Median filter is effective to remove salt and pepper impulse noise.
+
+n = 256;
+M = load_image('lena');
+M = rescale(crop(M, n));
+% add noise at random locations
+r = .3;  % 30% location corrupted
+I = randperm(n^2); I = I(1:round(r*end));
+M(I) = rand(size(I));
+% do the filtering
+M1 = perform_median_filtering(M,2);
+% display
+imageplot({M M1}, {'Original' 'Filtered'});
+
+
+%% Line integral convolution
+% The LIC algorithm filters an image along a vector field. 
+
+%%
+% create a vector field (this is done using the functions of the diffc
+% toolbox).
+
+n = 256;    % size of the image
+sigma = 60; % regularity of the vector field
+options.bound = 'sym'; % boundary handling
+v = perform_blurring(randn(n,n,2), sigma, options);
+v = perform_vf_normalization(v);
+
+%%
+% Now we perform the LIC of an initial noise image along the flow.
+
+M = randn(n);
+% parameters for the LIC
+options.histogram = 'linear'; % keep contrast fixed
+options.verb = 0;
+options.dt = 1.5; % time steping
+% size of the features
+options.flow_correction = 1;
+options.niter_lic = 2; % several iterations gives better results
+% iterated lic
+Mlist = {};
+for i=1:4
+    options.M0 = M;
+    Mlist{end+1} = perform_lic(v, i*4, options);
+end
+% display
+clf; imageplot(Mlist,'',2,2);
+
+
+
+%% TV denoising
+% The Sparsity Toolbox implements TV denoising, that minimizes the total variation of
+% the image. 
+
+%%
+% |argmin_f |F-f|^2 + 2*lambda*TV(f)|
+
+%%
+% Where |F| is the noisy image and |f| is the optimized denoised image.
+% |TV(f)| is the discrete total variation of the image. |lambda| controls
+% how much denoising you want to perform.
+
+
+%%
+% It corresponds to the Rudin/Osher/Fatemi image denoiser
+% (lagrangian formulation), and works well for images with strong edges
+% (otherwise, wavelets performs better). The TV minimization is performed
+% using the iterative fixed point algorihtm of Chambolle (published in
+% JMIV 2002). A nice feature of the algorithm is that you can give him
+% the target residual value (norm of the noise) in |options.etgt| and it will track it for
+% you during the iterations, and will automatically select the correct |lambda| value.
+
+
+%%
+% First we load and image and make some noise.
+
+n = 128;
+M0 = load_image('lena',256);
+M0 = rescale(crop(M0,n));
+sigma = .1;
+M = M0 + randn(size(M0))*sigma;
+% display
+clf; imageplot({clamp(M0) clamp(M)},{'Original' 'Noisy'});
+
+%%
+% We set the target residual error |options.etgt| just little larger than the noise level
+% |n*sigma|, and run the algorithm.
+
+% some parameter for the algorithm
+options.verb = 0; 
+options.display = 0;
+options.niter = 300;    % number of iterations
+options.etgt = 1.1*sigma*n;
+options.lambda = .3; % initial regularization
+% now we perform the denoising
+[Mtv,err,tv,lambda] = perform_tv_denoising(M,options);
+
+
+%% 
+% We display the result.
+
+clf; imageplot({clamp(M) clamp(Mtv)},{'Noisy' 'TV Denoised'});
+
+%%
+% We can keep track of the decay of |lambda| during the iteration and the
+% Lagrangian decay.
+
+clf;
+subplot(2,1,1);
+h = plot(lambda); axis tight;
+set(h, 'LineWidth', 2);
+set(gca, 'FontSize', 20);
+title('Evolution of \lambda');
+subplot(2,1,2);
+lagr = .5*err.^2 + lambda(end)*tv;
+h = plot(lagr); axis tight;
+set(h, 'LineWidth', 2);
+set(gca, 'FontSize', 20);
+title('Evolution of |y-U x|^2+\lambda |x|_1');
+axis([1 options.niter min(lagr) min(lagr)*1.3]);
+
+##### SOURCE END #####
+-->
+   </body>
+</html>

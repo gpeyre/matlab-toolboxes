@@ -1,0 +1,198 @@
+
+<!DOCTYPE html
+  PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html><head>
+      <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+   <!--
+This HTML is auto-generated from an M-file.
+To make changes, update the M-file and republish this document.
+      --><title>Total Variation Denoising</title><meta name="generator" content="MATLAB 7.10"><meta name="date" content="2010-12-29"><meta name="m-file" content="test_tv_lagrangian"><style type="text/css">
+
+body {
+  background-color: white;
+  margin:10px;
+}
+
+h1 {
+  color: #990000; 
+  font-size: x-large;
+}
+
+h2 {
+  color: #990000;
+  font-size: medium;
+}
+
+/* Make the text shrink to fit narrow windows, but not stretch too far in 
+wide windows. */ 
+p,h1,h2,div.content div {
+  max-width: 600px;
+  /* Hack for IE6 */
+  width: auto !important; width: 600px;
+}
+
+pre.codeinput {
+  background: #EEEEEE;
+  padding: 10px;
+}
+@media print {
+  pre.codeinput {word-wrap:break-word; width:100%;}
+} 
+
+span.keyword {color: #0000FF}
+span.comment {color: #228B22}
+span.string {color: #A020F0}
+span.untermstring {color: #B20000}
+span.syscmd {color: #B28C00}
+
+pre.codeoutput {
+  color: #666666;
+  padding: 10px;
+}
+
+pre.error {
+  color: red;
+}
+
+p.footer {
+  text-align: right;
+  font-size: xx-small;
+  font-weight: lighter;
+  font-style: italic;
+  color: gray;
+}
+
+  </style></head><body><div class="content"><h1>Total Variation Denoising</h1><p>Test for Rudin-Osher-Fatemi denoising (ROF) using FB-like method.</p><pre class="codeinput">addpath(<span class="string">'../'</span>);
+addpath(<span class="string">'../toolbox/'</span>);
+</pre><p>Load image.</p><pre class="codeinput">n = 256;
+y = load_image(<span class="string">'lena'</span>,n*2);
+y = rescale(crop(y,n));
+y = y + randn(n)*.06;
+</pre><p>Display it.</p><pre class="codeinput">clf;
+imageplot(clamp(y));
+</pre><img vspace="5" hspace="5" src="test_tv_lagrangian_01.png" alt=""> <p>We aim at minimising:</p><p><tt>min_x 1/2*norm(y-x,'fro')^2 + lambda*norm(K(x),1)</tt></p><p>Regularization parameter.</p><pre class="codeinput">lambda = .2;
+</pre><p>where <tt>K</tt> is a vectorial gradient and <tt>norm(u,1)</tt> is a vectorial L1 norme.</p><pre class="codeinput">K = @(x)grad(x);
+KS = @(x)-div(x);
+</pre><p>It can be put as the minimization of <tt>F(K*x) + G(x)</tt></p><pre class="codeinput">Amplitude = @(u)sqrt(sum(u.^2,3));
+F = @(u)lambda*sum(sum(Amplitude(u)));
+G = @(x)1/2*norm(y-x,<span class="string">'fro'</span>)^2;
+</pre><p>The proximity operator of <tt>F</tt> is the vectorial soft thresholding.</p><pre class="codeinput">Normalize = @(u)u./repmat( max(Amplitude(u),1e-10), [1 1 2] );
+ProxF = @(u,tau)repmat( perform_soft_thresholding(Amplitude(u),lambda*tau), [1 1 2]).*Normalize(u);
+ProxFS = compute_dual_prox(ProxF);
+</pre><p>The proximity operator of G.</p><pre class="codeinput">ProxG = @(x,tau)(x+tau*y)/(1+tau);
+</pre><p>Function to record progression of the functional.</p><pre class="codeinput">options.report = @(x)G(x) + F(K(x));
+</pre><p>Run the ADMM algorihtm.</p><pre class="codeinput">options.niter = 300;
+[xAdmm,EAdmm] = perform_admm(y, K,  KS, ProxFS, ProxG, options);
+</pre><pre class="codeoutput">[********************]
+</pre><p>Display image.</p><pre class="codeinput">clf;
+imageplot(xAdmm);
+</pre><img vspace="5" hspace="5" src="test_tv_lagrangian_02.png" alt=""> <p>Since the functional to mimize is stricly convex, we can use a FB scheme on the dual problem.</p><pre class="codeinput">GradGS = @(x)x+y;
+L = 8;
+options.method = <span class="string">'fista'</span>;
+[xFista,EFista] = perform_fb_strongly(y, K, KS, GradGS, ProxFS, L, options);
+</pre><pre class="codeoutput">[********************]
+</pre><p>Compare the energy decays.</p><pre class="codeinput">clf;
+plot([EAdmm(:) EFista(:)]);
+axis <span class="string">tight</span>;
+legend(<span class="string">'ADMM'</span>, <span class="string">'FISTA'</span>);
+axis([1 length(EAdmm) EFista(end)*.9 2000]);
+</pre><img vspace="5" hspace="5" src="test_tv_lagrangian_03.png" alt=""> <p class="footer"><br>
+      Published with MATLAB&reg; 7.10<br></p></div><!--
+##### SOURCE BEGIN #####
+%% Total Variation Denoising
+% Test for Rudin-Osher-Fatemi denoising (ROF) using FB-like method.
+
+addpath('../');
+addpath('../toolbox/');
+
+%%
+% Load image.
+
+n = 256;
+y = load_image('lena',n*2);
+y = rescale(crop(y,n));
+y = y + randn(n)*.06;
+
+%%
+% Display it.
+
+clf;
+imageplot(clamp(y));
+
+%%
+% We aim at minimising:
+
+%%
+% |min_x 1/2*norm(y-x,'fro')^2 + lambda*norm(K(x),1)|
+
+
+%%
+% Regularization parameter.
+
+lambda = .2;
+
+%%
+% where |K| is a vectorial gradient and |norm(u,1)| is a vectorial L1
+% norme.
+
+K = @(x)grad(x);
+KS = @(x)-div(x);
+
+%%
+% It can be put as the minimization of |F(K*x) + G(x)|
+
+Amplitude = @(u)sqrt(sum(u.^2,3));
+F = @(u)lambda*sum(sum(Amplitude(u)));
+G = @(x)1/2*norm(y-x,'fro')^2;
+
+%%
+% The proximity operator of |F| is the vectorial soft thresholding.
+
+Normalize = @(u)u./repmat( max(Amplitude(u),1e-10), [1 1 2] );
+ProxF = @(u,tau)repmat( perform_soft_thresholding(Amplitude(u),lambda*tau), [1 1 2]).*Normalize(u);
+ProxFS = compute_dual_prox(ProxF);
+
+%%
+% The proximity operator of G.
+
+ProxG = @(x,tau)(x+tau*y)/(1+tau);
+
+%%
+% Function to record progression of the functional.
+
+options.report = @(x)G(x) + F(K(x));
+
+%%
+% Run the ADMM algorihtm.
+
+options.niter = 300;
+[xAdmm,EAdmm] = perform_admm(y, K,  KS, ProxFS, ProxG, options);
+
+%%
+% Display image.
+
+clf;
+imageplot(xAdmm);
+
+%%
+% Since the functional to mimize is stricly convex, we can use a FB scheme
+% on the dual problem.
+
+GradGS = @(x)x+y;
+L = 8;
+options.method = 'fista';
+[xFista,EFista] = perform_fb_strongly(y, K, KS, GradGS, ProxFS, L, options);
+
+%%
+% Compare the energy decays.
+
+clf;
+plot([EAdmm(:) EFista(:)]);
+axis tight;
+legend('ADMM', 'FISTA');
+axis([1 length(EAdmm) EFista(end)*.9 2000]);
+
+ 
+ 
+##### SOURCE END #####
+--></body></html>

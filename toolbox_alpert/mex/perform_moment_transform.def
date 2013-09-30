@@ -1,0 +1,3 @@
+LIBRARY perform_moment_transform.dll
+EXPORTS
+	mexFunction

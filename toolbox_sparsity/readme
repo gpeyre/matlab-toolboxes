@@ -1,0 +1,11 @@
+Toolbox sparsity - sparsity-based signal processing related functions.
+
+This toolbox contains functions related to sparsity optimization in signal processing, including 
+* general purpose sparse solvers, including OMP, BP and iterative thresholding.
+* bilinear optimizers for dictionary design (KSVD and MOD).
+* compressed sensing functions.
+* theoritical bounds to ensure recovery with L1 optimization (coherence, ERC).
+* Morphological Component Analysis algorithm for image separation and inpainting.
+* Various helpers functions.
+
+Copyright (c) 2007 Gabriel Peyre

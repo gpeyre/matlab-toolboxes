@@ -1,0 +1,3 @@
+LIBRARY perform_dijkstra_propagation.dll
+EXPORTS
+	mexFunction

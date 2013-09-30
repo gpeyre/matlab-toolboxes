@@ -1,0 +1,71 @@
+Toolbox for non-smooth convex optimization using first order schemes.
+by Gabriel Peyré, www.numerical-tours.com
+
+****** DISCLAIMER ******
+
+This toolbox contains the implementation of what I consider to be fundamental algorithms 
+for non-smooth convex optimization of structured functions. These algorithms might not be the fasted
+(although they certainly are quite efficient), but they all have a simple implementation in term
+of black boxes (gradient and proximal mappings, given as callbacks). However, you should have 
+some knowledge about what is a gradient operator and a proximal mapping in order to be able
+to use this toolbox on your own problems. I suggest you have a look at the
+"suggested readings" for some more information about all this. 
+
+****** CONTENT Of THE TOOLBOX ******
+
+The algorithms are implemented in the functions:
+* perform_admm.m
+* perform_dr.m
+* perform_fb_strongly.m
+* perform_fb.m
+A useful helper function is compute_dual_prox.m to switch between proximal mapping of the primal and dual functions.
+The directory tests/ contains some simple examples of application to TV and L1 minimization. 
+You can use them as starting point for your own problems. The directory tests/html/ contains the HTML files with the results.
+
+****** PROBLEMS CONSIDERED ******
+
+These schemes are used for the minimization of convex problems that can be split as either
+   min_x F(x)+G(x)          (*)
+or 
+   min_x F(K(x)) + G(x)     (**)
+where F and G are convex functions and K is a linear operator.
+
+The two important quality of a function F is 
+* Being smooth, i.e. one can compute its gradient nabla F.
+* Being proximable, i.e. one can compute its proximal mapping
+   Prox_{lambda*F}(x) = argmin_{y} 1/2*norm(x-y)^2 + lambda*F(x)
+Basic examples of proximable function are function that can be written as
+   F(x) = sum_i f(x_i)
+where x_i is a 1-D or 2-D component of x, and f is a low dimensional function. In this case
+  Prox_{lambda*F}(x) = ( Prox_{lambda*f}(x_i) )_i
+* Being strongly convex (larger than a quadratic function).
+
+Some algorithms make use of the dual function, defined as
+   F^*(y) = max_x <x,y>-F(x)
+
+****** ALGORITHMS IMPLEMENTED ******
+
+The algorithms implemented are:
+* Forward-backward (FB) splitting schemes (includes classical FB and accelerated schemes
+such as Nesterov and FISTA). 
+==> Works for problem (*), with F smooth and G proximable.
+* Preconditonned ADMM scheme
+==> Works for problem (**), with F and G proximable.
+* Douglas-Rachord (DR) splitting scheme
+==> Works for problem (*), with F and G proximable.
+* FB on the dual
+==> Works for (**) with F proximable, G strongly convex so that one can compute the gradient of G^*.
+
+Both gradients and proximal mappings should be given as callback functions.
+
+****** SUGGESTED READINGS ******
+
+To learn about first order schemes:
+* Proximal Splitting Methods in Signal Processing, Patrick L. Combettes and Jean-Christophe Pesquet
+* Gradient-Based Algorithms with Applications to Signal Recovery Problems, Amir Beck and Marc Teboulle
+
+To learn more about the connexion with signal and image processing:
+* Blind Source Separation: the Sparsity Revolution, Bobin J. a Starck J.-L. a Moudden Y. a Fadili M.J
+* A wavelet tour of signal processing, 3rd edition, S. Mallat.
+* Numerical Tours of Signal Processing, www.numerical-tours.com
+Copyright (c) 2010 Gabriel Peyre

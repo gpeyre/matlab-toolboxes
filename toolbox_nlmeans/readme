@@ -1,0 +1,48 @@
+A toolbox for the non-local means algorithm.
+by Gabriel Peyré, 2007.
+
+The non-local means is an algorithm introduced by A. Buades, B. Coll, J.M Morel.
+The main reference for the algorithm is 
+
+    A. Buades, B. Coll, J.M Morel,  
+    "A review of image denoising algorithms, with a new one" , 
+    Multiscale Modeling and Simulation (SIAM interdisciplinary journal), Vol 4 (2), pp: 490-530, 2005.
+
+This toolbox implements the algorithm in a fairly general way in a C file that can be called from Matlab. It allows to perform the traditional NL-means for denoising (for both B&W and color images) but also to use an arbitrary set of patches to perform the denoising. 
+
+
+INSTALLATION:
+
+Un-zip the file in your directory and start matlab from the unzipped directory. First compile the main mex file using 
+   > compile_mex;
+If this is not working, you should select your compiler using 
+   > mex -setup
+Before writing your own code, be sure to add the following line
+   path(path,'toolbox/');
+so that the additional helper functions (such as image loading and resizing) are available. This is done automatically at the beginging of the test files "test_xxx.m".
+
+
+GETTING STARTED:
+
+I recommend that you run the file "test_nlmeans" (the best would be to run each line one by one to see the effect) to perform a traditional denoising. Then you can start to play with the parameters.
+
+SOME COMMENTS ON THE PARAMETERS:
+
+
+
+
+ADVANCED USES OF THE TOOLBOX:
+
+You can denoise an image using the patch of another image. This is useful for funny renderings or for textures synthesis. My recommendation is then to use a small variance for the averaging, but to iterate the NL-means processing. This way, at each iteration, the algorithm will automatically initialize its search around the previous best match (and not from the original pixel). I recommend that you run test_nlmeans_duo.m to see this method.
+
+You can perform very nice texture synthesis by denoising with NL-means a white noise. To that end, you can use the patch from another image. The file text_nl_synthesis.m does exactly that. For synthesis, you can even set the variance options.T to a very small number (like 1e-9) so that no averaging is performed and pixel recopy is simply performed. Once again this should be iterated so that the synthesis improves through iterations. This process is equivalent to traditional texture synthesis as explained in 
+
+	Alexei A. Efros and Thomas K. Leung
+	"Texture Synthesis by Non-parametric Sampling"
+	IEEE International Conference on Computer Vision (ICCV'99),
+
+You can also perform denoising (or synthesis) using patches from a synthetic dictionary. I have implemented a dictionary of binary step edges, and you can see the effect of tynehis in test_edge_synthesis.m.
+
+You can enhance the reconstruction by specifying options.do_patchwise=1. This will perform a reconstruction by averaging the overlapping patch (instead of avergaging only the central pixel). This is very usefull for texture synthesis.
+
+Copyright (c) 2007 Gabriel Peyré

@@ -1,0 +1,318 @@
+Baseline Wavelet Transform Coder Construction Kit
+-------------------------------------------------
+Version 0.3, 1/29/97
+-------------------------------------------------
+Geoff Davis
+gdavis@cs.dartmouth.edu
+http://www.cs.dartmouth.edu/~gdavis
+-------------------------------------------------
+Arithmetic coding library courtesy of
+John Danskin
+jmd@cs.dartmouth.edu
+http://www.cs.dartmouth.edu/~jmd
+
+PGM file load/save courtesy of
+Ray Heasman
+ray@rucus.ru.ac.za
+-------------------------------------------------
+
+Source is available from
+http://www.cs.dartmouth.edu/~gdavis/wavelet/wavelet.html
+
+NOTE: This is an alpha version of the code!  It isn't yet fully
+documented.  Eventually I hope to have a tutorial to accompany this.
+There are one or two known (minor) bugs.  Upgrades will be supplied on
+the web at irregular intervals.  Caveat emptor.
+
+-------------------------------------------------
+Revision log
+
+Version 0.3 1/29/97 --  fixed a bug in the allocator so that actual rates
+				are much closer to target rates
+			switched to binary files for i/o -- this hopefully
+				will fix problems people using DOS/Windows95
+				were having (thanks to Daniel Weng)
+			changed default for Real to float from double
+			fixed the copy constructor for WaveletTransform
+			plugged some memory leaks in the WaveletTransform 
+				constructors (thanks to Derek Ho)
+			added new filter set from J. Odegard and S. Burrus
+
+Version 0.2 11/22/96 -- plugged lots of memory leaks, fixed minor
+				bugs in encode.cc and decode.cc
+			replaced all references to doubles with Reals
+			added support for PGM files
+				(thanks to Ray Heasman)
+			added double precision coefficients
+				from EPIC (thanks to Eero Simoncelli)
+
+Version 0.1 10/13/96 -- fixed a few compiler bugs
+			plus a minor bug in
+			quantizer.cc
+
+Version 0.0  9/12/96 -- initial version
+-------------------------------------------------
+
+
+This code implements a reasonably good wavelet transform-based image
+coder for grayscale images.  The coder is not the most sophisticated
+-- it's a simple transform coder -- but each individual piece of the
+transform coder has been chosen for high performance.  
+
+Performance Data for 512x512 Lena image (default settings)
+
+Target compression ratio        Actual ratio	PSNR (dB)	RMS error
+------------------------        ------------    ---------       ---------
+4:1				4.02:1 		43.71		1.66
+8:1				8.00:1		39.42		2.73
+16:1				16.01:1		36.18		3.96
+32:1				32.01:1		33.17		5.60
+64:1				64.08:1		30.22		7.86
+128:1				129.26:1	27.73		10.48
+
+The code has been designed for experimentation.  It's very modular and
+should allow for simple replacements of individual components.  One
+can easily replace the quantizer, the entropy coder, and the wavelet
+filters.  
+
+If you do modify/upgrade/replace sections of this code, I would very
+much appreciate hearing about it.  I hope to make this construction
+kit a collaborative effort with a whole range of modules supplied by
+different researchers.  A wish list of future improvements is included
+at the end of this file.  I will provide WWW links to any extensions
+people provide.
+
+A transform coder consists of 3 basic steps.
+1) an invertible transform is performed on an image
+2) the transform coefficients are quantized (discretized)
+3) the quantized coefficients are entropy coded
+
+The entropy coding, quantization routines, and bit allocation are very
+general-purpose.  They will work with a whole variety of transforms,
+including DCT's, wavelet packets, local trig bases, etc.  Moreover,
+they have been designed with the expectation that other features such
+as zerotrees or perceptual weighting will be added later.
+Implementing more sophisticated coders such as those described in
+Z. Xiong, K. Ramchandran and M. T. Orchard, ``Wavelet Packets Image
+Coding Using Space-frequency Quantization", Preprint, 1996 and
+Z. Xiong, K. Ramchandran and M. T. Orchard, "Space-frequency
+Quantization for Wavelet Image Coding", to appear in IEEE Trans. Image
+Processing, 1997 (see http://www.ee.princeton.edu/~zx/articles.html)
+should be relatively easy to do given this code.  The current
+transform routine should be fairly straightforward to extend to perfom
+wavelet packet decompositions.
+
+The wavelet transform implements symmetrized boundaries and works for
+images of (more or less) arbitrary sizes, as long as the aspect ratio
+is less than 2:1 (the aspect ratio limitation should be
+straightforward to eliminate, but I haven't gotten around to it).  For
+the full details on how to perform such a transform, see
+ftp://ftp.c3.lanl.gov/pub/WSQ/documents/classify.ps.Z, "Classification
+of nonexpansive symmetric extension transforms for multirate filter
+banks," Chris Brislawn, Los Alamos Tech Report LA-UR-94-1747.  Also
+see ftp://ftp.c3.lanl.gov/pub/WSQ/tutorial/tutorial.c
+
+The filters included with the wavelet transform include some of the
+best known for image coding.  It includes the set from J. Villasenor,
+B. Belzer, J. Liao, "Wavelet Filter Evaluation for Image Compression."
+IEEE Transactions on Image Processing, Vol. 2, pp. 1053-1060, August
+1995 (http://synergy.icsl.ucla.edu/~ipl/papers.html).  There are a few
+extra filters from Brislawn's code, a few Daubechies filters, and a
+new (unpublished) 18/10 filter that Villasenor's group has found
+effective.  I've also just added a 7/9 pair from J. E. Odegard and
+C. S. Burrus, "Smooth biorthogonal wavelets for applications in image
+compression," in Proceedings of DSP Workshop, Loen, Norway, September
+1996 (http://www-dsp.rice.edu/publications).  This pair yields
+superior results to the standard Antonini pair for EZW on Barbara.<p>
+
+Two sets of quantizers are included.  The first set performs a uniform
+quantization and is fairly straightforward.  The second is an embedded
+family of quantizers fully described in D. Taubman and A. Zakhor,
+"Multirate 3-D subband coding of video", IEEE Transactions on Image
+Processing, Vol 3, No. 5, Sept, 1994.  The quantizers are equivalent
+to those used in J. Shapiro, "Embedded image coding using zerotrees of
+wavelet coefficients," IEEE Transactions on Signal Processing,
+Vol. 41, No. 12, pp. 3445--3462, Dec. 1993, but are coupled with a
+more effective entropy coding scheme.
+
+Two sets of adaptive entropy coding schemes are also included.  The
+first performs histogram adaptation with escape codes.  The escape
+codes keeps rare symbols from adding too much to the overall symbol
+cost during early stages of histogram adaptation (see _Text
+Compression_ by Bell, Cleary, and Witten for details).  The second
+coder is an embedded coder designed for use with the embedded
+quantizer above (See Taubman and Zakhor for full details).  It adapts
+very quickly and is very effective.
+
+The arithmetic coder is based on an implementation of Alistair
+Moffat's linear time coding histogram (see
+http://www.cs.mu.oz.au/~alistair/papers.html).  The implementation is
+courtesy of John Danskin, and the full distribution (most of which is
+included here) may be obtained from http://www.cs.dartmouth.edu/~jmd.
+
+The bit allocation routines are based on integer programming
+algorithms described in Y. Shoham and A. Gersho, "Efficient bit
+allocation for an arbitrary set of quantizers," IEEE Transactions on
+Acoustics, Speech, and Signal Processing, Vol. 36, No. 9,
+pp. 1445-1453, Sept 1988.  They provide optimal or near-optimal
+allocations for the quantizers included here.
+---------------------------------------------------------------------------
+
+Executables
+-----------
+encode		Code an image
+	     	Usage: encode [image][width][height][output][ratio]
+		        image: image to be compressed
+	     		width, height: width and height of image to be
+					compressed
+			output: name of compressed image
+	     		ratio:  target compression ratio
+
+decode		Decode an image
+		Usage: decode [encoded image][decoded image]
+
+compare		Compare two pbm/pgm images.  Returns MSE, RMS error, and PSNR
+		Usage: compare [image 1][image 2][width][height]
+
+raw2pgm		Convert an image in raw/raster format to PGM
+		Usage: raw2pgm [raw image name][height][width][pgm image name]
+
+pgm2raw		Convert an image in pgm/pbm format to a raw/raster format
+		Usage: pgm2raw [pgm image name][raw image name]
+
+The source files in this directory can be broken up into several main
+classes, each pertaining to one of the above steps plus some global
+stuff.
+
+Global Stuff
+------------
+encode.cc			Main encoding program -- puts together
+				all steps in the coding process
+
+decode.cc			Main decoding program -- puts together
+				all steps in the decoding process
+
+compare.cc	 		Useful utility for comparing images
+
+pgm2raw.cc			Format conversion: pgm->raw
+
+raw2pgm.cc			Format conversion: raw->pgm
+
+global.cc, global.hh		Location of global functions and
+				definitions
+
+Transform Step
+--------------
+The routines below take an image (in pbm/pgm format) and perform a 2-D
+wavelet transform.
+
+image.cc, image.hh		Handles loading/saving raw, pbm images
+
+wavelet.cc, wavelet.hh		Performs a wavelet transform on an
+				image.  Handles non-square images
+				(with aspect ratio < 2:1).  Uses
+				symmetric extension of boundaries for
+				symmetric filters and periodic
+				extension for asymmetric ones.
+
+filter.cc			Contains filter coefficients for
+				various wavelets.  Contains all
+				filters from J. Villasenor, B. Belzer,
+				J. Liao, "Wavelet Filter Evaluation
+				for Image Compression." IEEE
+				Transactions on Image Processing,
+				Vol. 2, pp. 1053-1060, August 1995
+				
+
+transform.cc, transform.hh	Breaks wavelet transformed images up
+				into subbands.  This makes
+				postprocessing more convenient and
+				also independent of the method of
+				transform (e.g. iterated filtering,
+				lifting, etc.) 
+
+Quantization Step
+-----------------
+These routines take subsets of the transform coefficients (typically a
+subset corresponds to all coefficients in a given subband) and determine
+appropriate quantizer precisions for each subset.  Quantizer
+resolutions are chosen to minimize total quantization error subject to
+a constraint on the total number of bits required to store the
+quantized coefficients. 
+
+coeffset.cc, coeffset.hh	Storage for different subsets of
+				coefficients.  Also stores total bit
+				cost (rate) and total distortion for
+				each quantizer resolution.
+
+metric.hh			Functions for determining total
+				quantization error.  The most common
+				error measure is squared distortion.
+
+quantizer.cc, quantizer.hh	Quantizes coefficients at various
+				resolutions.
+
+allocator.cc, allocator.hh	Uses a constrained optimization
+				procedure to determine quantizer
+				resolutions for each set of
+				coefficients.
+
+Entropy Coding Step
+-------------------
+entropy.cc, entropy.hh		High-level entropy coding routines.
+				Writes/reads coefficients.  Allows
+				use of adaptive histograms and
+				context-based coding.
+
+coder.cc, coder.hh		High-level I/O interface for entropy
+				coding routines above.  Also allows
+				efficient coding of individual bits
+				and arbitrarily sized integers. 
+
+Arith.cc, Arith.h		Low-level arithmetic coding routines.
+				Based on an implementation of Alistair
+				Moffat's linear time coding histogram
+				by John Danskin.  The full
+				distribution may be obtained from 
+				(http://www.cs.dartmouth.edu/~jmd)
+
+iHisto.cc, iHisto.h		More low-level arithmetic coding
+				routines from the above package.
+
+IntCoding.cc, IntCoding.hh	Integer coding routines for coder.cc
+				courtesy of John Danskin.
+
+BitIO.cc, BitIO.h		Bit-level I/O routines from John's
+				package.
+
+
+Wish list for future improvements (send me your code!)
+------------------------------------------------------
+* Modify wavelet.cc and transform.cc to handle images with different
+  aspect ratios (shouldn't be too hard).
+
+* Add support for color!  The easiest way to do this would be to take
+  an RGB image and to transform it to something like YIQ or HUV and
+  then code each layer separately.
+
+* Upgrade image.cc to support more image formats.  Read/write .tiff's, 
+  .gif's, etc.
+
+* Add Lloyd-Max scalar quantizers.
+
+* Add trellis coding to reduce quantization errors.
+
+* Add zerotrees.
+
+* Add an 8x8 block DCT so that the code can be modified to do JPEG.
+
+* Add an 8x8 block DCT with folding. 
+
+* Implement wavelet transform via lifting to improve speed.
+
+* Fix arithmetic coder so can switch back & forth between coding and
+  writing ints/bits.
+
+* Upgrade the dequantize routines, the entropy coder, and the
+  arithmetic coder so that the code can handle truncated bitstreams.
+

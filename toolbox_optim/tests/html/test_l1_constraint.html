@@ -1,0 +1,185 @@
+
+<!DOCTYPE html
+  PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html><head>
+      <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+   <!--
+This HTML is auto-generated from an M-file.
+To make changes, update the M-file and republish this document.
+      --><title>Basis Pursuit with Douglas Rachford</title><meta name="generator" content="MATLAB 7.10"><meta name="date" content="2010-12-29"><meta name="m-file" content="test_l1_constraint"><style type="text/css">
+
+body {
+  background-color: white;
+  margin:10px;
+}
+
+h1 {
+  color: #990000; 
+  font-size: x-large;
+}
+
+h2 {
+  color: #990000;
+  font-size: medium;
+}
+
+/* Make the text shrink to fit narrow windows, but not stretch too far in 
+wide windows. */ 
+p,h1,h2,div.content div {
+  max-width: 600px;
+  /* Hack for IE6 */
+  width: auto !important; width: 600px;
+}
+
+pre.codeinput {
+  background: #EEEEEE;
+  padding: 10px;
+}
+@media print {
+  pre.codeinput {word-wrap:break-word; width:100%;}
+} 
+
+span.keyword {color: #0000FF}
+span.comment {color: #228B22}
+span.string {color: #A020F0}
+span.untermstring {color: #B20000}
+span.syscmd {color: #B28C00}
+
+pre.codeoutput {
+  color: #666666;
+  padding: 10px;
+}
+
+pre.error {
+  color: red;
+}
+
+p.footer {
+  text-align: right;
+  font-size: xx-small;
+  font-weight: lighter;
+  font-style: italic;
+  color: gray;
+}
+
+  </style></head><body><div class="content"><h1>Basis Pursuit with Douglas Rachford</h1><!--introduction--><p>Test for DR algorithm for L1 minimization (BP). We do here a compressed sensing resolution (random matrix).</p><!--/introduction--><p>Add the toolbox.</p><pre class="codeinput">addpath(<span class="string">'../'</span>);
+addpath(<span class="string">'../toolbox/'</span>);
+</pre><p>Dimensionality of the signal and number of measurements.</p><pre class="codeinput">n = 200;
+p = n/4;
+</pre><p>Sensing matrix.</p><pre class="codeinput">A = randn(p,n);
+</pre><p>Measurements.</p><pre class="codeinput">y = randn(p,1);
+</pre><p>We aim at solving</p><p><tt>min_{A*x=y} norm(x,1)</tt></p><p>This can be rewriten as the minimization of <tt>F(x)+G(x)</tt> where <tt>F=norm(x,1)</tt> and <tt>G=i_{A*x=y}</tt> is the indicator function.</p><p>The proximity operator of the L1 norm is the soft thresholding.</p><pre class="codeinput">ProxF = @(x,tau)perform_soft_thresholding(x, tau);
+</pre><p>The proximity operator of the indicator of <tt>A*x=y</tt> is the orthogonal projection on A*x=y.</p><pre class="codeinput">pA = A'*(A*A')^(-1);
+ProxG = @(x,tau)x + pA*(y-A*x);
+</pre><p>Create a function to record the values of F and the constraint at each iteration.</p><pre class="codeinput">F = @(x)norm(x,1);
+Constr = @(x)1/2*norm(y-A*x)^2;
+options.report = @(x)struct(<span class="string">'F'</span>, F(x), <span class="string">'Constr'</span>, Constr(x));
+</pre><p>Run the algorithm.</p><pre class="codeinput">options.gamma = 5;
+options.niter = 5000;
+[x,R] = perform_dr(zeros(n,1), ProxF, ProxG, options);
+</pre><pre class="codeoutput">[********************]
+</pre><p>Display the solution. At convergence, it should be of sparsity <tt>p</tt>.</p><pre class="codeinput">clf;
+plot(x);
+axis <span class="string">tight</span>;
+</pre><img vspace="5" hspace="5" src="test_l1_constraint_01.png" alt=""> <p>Retrieve the F and constraint function values.</p><pre class="codeinput">f = s2v(R,<span class="string">'F'</span>);
+constr = s2v(R,<span class="string">'Constr'</span>);
+</pre><p>Display.</p><pre class="codeinput">clf;
+subplot(2,1,1);
+plot(f(2:end));
+axis <span class="string">tight</span>; title(<span class="string">'Objective'</span>);
+subplot(2,1,2);
+plot(constr(2:end));
+axis <span class="string">tight</span>; title(<span class="string">'Constraint'</span>);
+</pre><img vspace="5" hspace="5" src="test_l1_constraint_02.png" alt=""> <p class="footer"><br>
+      Published with MATLAB&reg; 7.10<br></p></div><!--
+##### SOURCE BEGIN #####
+%% Basis Pursuit with Douglas Rachford
+% Test for DR algorithm for L1 minimization (BP).
+% We do here a compressed sensing resolution
+% (random matrix).
+
+%%
+% Add the toolbox.
+
+addpath('../');
+addpath('../toolbox/');
+
+%% 
+% Dimensionality of the signal and number of measurements.
+
+n = 200;
+p = n/4;
+
+%%
+% Sensing matrix.
+
+A = randn(p,n);
+
+%%
+% Measurements.
+
+y = randn(p,1);
+
+%%
+% We aim at solving 
+
+%%
+% |min_{A*x=y} norm(x,1)|
+
+%%
+% This can be rewriten as the minimization of |F(x)+G(x)|
+% where |F=norm(x,1)| and |G=i_{A*x=y}| is the indicator function.
+
+
+%%
+% The proximity operator of the L1 norm is the soft thresholding.
+
+ProxF = @(x,tau)perform_soft_thresholding(x, tau);
+
+%%
+% The proximity operator of the indicator of |A*x=y| is the orthogonal
+% projection on A*x=y.
+
+pA = A'*(A*A')^(-1);
+ProxG = @(x,tau)x + pA*(y-A*x);
+
+%%
+% Create a function to record the values of F and the constraint at each iteration.
+
+F = @(x)norm(x,1);
+Constr = @(x)1/2*norm(y-A*x)^2;
+options.report = @(x)struct('F', F(x), 'Constr', Constr(x));
+
+%%
+% Run the algorithm. 
+
+options.gamma = 5;
+options.niter = 5000;
+[x,R] = perform_dr(zeros(n,1), ProxF, ProxG, options);
+
+%%
+% Display the solution. At convergence, it should be of sparsity |p|.
+
+clf;
+plot(x);
+axis tight;
+
+%%
+% Retrieve the F and constraint function values.
+
+f = s2v(R,'F');
+constr = s2v(R,'Constr');
+
+%%
+% Display.
+
+clf;
+subplot(2,1,1);
+plot(f(2:end));
+axis tight; title('Objective');
+subplot(2,1,2);
+plot(constr(2:end));
+axis tight; title('Constraint');
+
+##### SOURCE END #####
+--></body></html>

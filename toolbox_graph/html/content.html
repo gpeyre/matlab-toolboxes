@@ -1,0 +1,528 @@
+
+<!DOCTYPE html
+  PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN">
+<html xmlns:mwsh="http://www.mathworks.com/namespace/mcode/v1/syntaxhighlight.dtd">
+   <head>
+      <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+   
+      <!--
+This HTML is auto-generated from an M-file.
+To make changes, update the M-file and republish this document.
+      -->
+      <title>Toolbox graph - A toolbox to process graph and triangulated meshes</title>
+      <meta name="generator" content="MATLAB 7.4">
+      <meta name="date" content="2008-08-29">
+      <meta name="m-file" content="content">
+      <LINK REL="stylesheet" HREF="style.css" TYPE="text/css">
+   </head>
+   <body>
+      <div class="content">
+         <h1>Toolbox graph - A toolbox to process graph and triangulated meshes</h1>
+         <introduction>
+            <p>Copyright (c) 2008 Gabriel Peyre</p>
+         </introduction>
+         <h2>Contents</h2>
+         <div>
+            <ul>
+               <li><a href="#3">3D Mesh Loading and Displaying</a></li>
+               <li><a href="#6">Differential Calculus on 3D Mesh</a></li>
+               <li><a href="#11">Mesh Filtering</a></li>
+               <li><a href="#18">Mesh parameterization</a></li>
+               <li><a href="#23">Tetrahedral Mesh Loading and Displaying</a></li>
+            </ul>
+         </div>
+         <p>The toolbox can be downloaded from Matlab Central <a href="http://www.mathworks.com/matlabcentral/fileexchange/loadFile.do?objectId=5355&amp;objectType=FILE">http://www.mathworks.com/matlabcentral/fileexchange/loadFile.do?objectId=5355&amp;objectType=FILE</a></p>
+         <p>First add to the path additional scripts.</p><pre class="codeinput">path(path, <span class="string">'toolbox/'</span>);
+path(path, <span class="string">'off/'</span>);
+clear <span class="string">options</span>;
+</pre><h2>3D Mesh Loading and Displaying<a name="3"></a></h2>
+         <p>A 3D mesh is composed of a <tt>vertex</tt> array of size <tt>(3,n)</tt> that contains the position in 3D (or sometimes 2D) of the vertices, and a <tt>face</tt> array of dimension <tt>(3,m)</tt> that contains the indexes of each triangulated face.
+         </p><pre class="codeinput"><span class="comment">% load the mesh</span>
+name = <span class="string">'elephant-50kv'</span>;
+options.name = name; <span class="comment">% useful for displaying</span>
+[vertex,faces] = read_mesh(name);
+<span class="comment">% display the mesh</span>
+clf;
+plot_mesh(vertex, faces);
+shading <span class="string">interp</span>;
+</pre><img vspace="5" hspace="5" src="content_01.png"> <p>You can zoom on the mesh and display its triangulated faces</p><pre class="codeinput">clf;
+<span class="keyword">for</span> i=1:4
+    subplot(2,2,i);
+    plot_mesh(vertex, faces);
+    shading <span class="string">faceted</span>;
+    zoom(1.8^(i+1));
+<span class="keyword">end</span>
+</pre><img vspace="5" hspace="5" src="content_02.png"> <p>You can compute the normal to the mesh, and displace the position of the vertices along the normal.</p><pre class="codeinput">options.face_vertex_color =  [];
+vertex1 = perform_normal_displacement(vertex,faces,.03);
+
+clf;
+subplot(1,2,1);
+plot_mesh(vertex,faces,options); shading <span class="string">interp</span>; axis <span class="string">tight</span>;
+subplot(1,2,2);
+plot_mesh(vertex1,faces,options); shading <span class="string">interp</span>; axis <span class="string">tight</span>;
+</pre><img vspace="5" hspace="5" src="content_03.png"> <h2>Differential Calculus on 3D Mesh<a name="6"></a></h2>
+         <p>You can compute matrix (sparse) of differential and averaging operators on 3D meshes. You can also compute curvature and normals.</p>
+         <p>You can compute normals and display them.</p><pre class="codeinput"><span class="comment">% load a mesh</span>
+name = <span class="string">'mushroom'</span>;
+options.name = name; <span class="comment">% useful for displaying</span>
+[vertex,faces] = read_mesh(name);
+<span class="comment">% compute normal per vertex and per face</span>
+[normal,normalf] = compute_normal(vertex,faces);
+<span class="comment">% display</span>
+options.normal = normal;
+clf; plot_mesh(vertex,faces,options); shading <span class="string">interp</span>; axis <span class="string">tight</span>;
+options.normal = [];
+</pre><img vspace="5" hspace="5" src="content_04.png"> <p>You can compute curvature quantities using local avergaging and PCA analysis.</p><pre class="codeinput"><span class="comment">% load the mesh</span>
+name = <span class="string">'elephant-50kv'</span>;
+options.name = name; <span class="comment">% useful for displaying</span>
+[vertex,faces] = read_mesh(name);
+<span class="comment">% compute the curvature</span>
+options.curvature_smoothing = 10;
+options.verb = 0;
+[Umin,Umax,Cmin,Cmax,Cmean,Cgauss,Normal] = compute_curvature(vertex,faces,options);
+<span class="comment">% display</span>
+clf;
+subplot(1,2,1);
+options.face_vertex_color = perform_saturation(Cgauss,1.2);
+plot_mesh(vertex,faces, options); shading <span class="string">interp</span>; colormap <span class="string">jet(256)</span>;
+title(<span class="string">'Gaussian curvature'</span>);
+subplot(1,2,2);
+options.face_vertex_color = perform_saturation(abs(Cmin)+abs(Cmax),1.2);
+plot_mesh(vertex,faces, options); shading <span class="string">interp</span>; colormap <span class="string">jet(256)</span>;
+title(<span class="string">'Total curvature'</span>);
+</pre><img vspace="5" hspace="5" src="content_05.png"> <p>A laplacian is an high pass operator that compute second order derivatives.</p><pre class="codeinput">name = <span class="string">'elephant-50kv'</span>;
+options.name = name; <span class="comment">% useful for displaying</span>
+[vertex,faces] = read_mesh(name);
+<span class="comment">% options for the Laplacians</span>
+laplacian_type = <span class="string">'conformal'</span>; <span class="comment">% slow to compute</span>
+laplacian_type = <span class="string">'combinatorial'</span>; <span class="comment">% fast, but inexact</span>
+laplacian_type = <span class="string">'distance'</span>; <span class="comment">% fast and more accurate</span>
+<span class="comment">% compute a normalized Laplacian</span>
+options.symmetrize = 0;
+options.normalize = 1;
+L = compute_mesh_laplacian(vertex,faces,laplacian_type,options);
+<span class="comment">% compute a non normalized Laplacian</span>
+options.symmetrize = 0;
+options.normalize = 1;
+L0 = compute_mesh_laplacian(vertex,faces,laplacian_type,options);
+</pre><p>Compute and display some eigenvectors of the Laplacian. They are the equivalent of the Fourier sinusoids on surfaces.</p><pre class="codeinput"><span class="comment">% compute a few eigenmodes</span>
+nb = 60;
+opts.disp = 0;
+[V,D] = eigs(L0,nb,<span class="string">'SM'</span>,opts); <span class="comment">% warning : it takes lot of time</span>
+V = real(V(:,end:-1:1));
+<span class="comment">% display them on the mesh</span>
+ilist = round(linspace(3,nb-3, 6));
+tau=2.2; <span class="comment">% saturation for display</span>
+clf;
+<span class="keyword">for</span> i=1:length(ilist)
+    <span class="comment">% subplot(1,length(ilist),i);</span>
+    v = real(V(:,ilist(i)));
+    v = clamp( v/std(v),-tau,tau );
+    options.face_vertex_color = v;
+    subplot(2,3,i);
+    plot_mesh(vertex,faces,options);
+    shading <span class="string">interp</span>; camlight; axis <span class="string">tight</span>; <span class="comment">% zoom(zoomf);</span>
+    colormap <span class="string">jet(256)</span>;
+<span class="keyword">end</span>
+</pre><img vspace="5" hspace="5" src="content_06.png"> <h2>Mesh Filtering<a name="11"></a></h2>
+         <p>You can filter a mesh by applying a filter operator, or iterating several time the filtering, which corresponds to the resolution
+            of the heat equation on the mesh
+         </p>
+         <p>First we create a noisy mesh by displacement of the vertices along the normal direction (those are the most distructive displacements).</p><pre class="codeinput">normals = compute_normal(vertex,faces);
+rho = randn(1,size(vertex,2))*.02;
+vertex1 = vertex + repmat(rho,3,1).*normals;
+</pre><p>Then we compute a filtering operator (low pass)</p><pre class="codeinput"><span class="comment">% parameters for the operator</span>
+laplacian_type = <span class="string">'distance'</span>;
+options.symmetrize = 0;
+options.normalize = 1; <span class="comment">% it must be normalized for filtering</span>
+options.verb = 0;
+W = compute_mesh_weight(vertex,faces,laplacian_type,options);
+<span class="comment">% This is the corresponding laplacian</span>
+L = compute_mesh_laplacian(vertex,faces,laplacian_type,options);
+</pre><p>We apply iteratively the operator to get filtered versions of the mesh.</p><pre class="codeinput">vertex2 = vertex1;
+clf;
+options.face_vertex_color = [];
+<span class="keyword">for</span> i=1:6
+    subplot(2,3,i);
+    plot_mesh(vertex2,faces,options); axis <span class="string">tight</span>; shading <span class="string">interp</span>;
+    vertex2 = (W*(W*vertex2'))';
+<span class="keyword">end</span>
+</pre><img vspace="5" hspace="5" src="content_07.png"> <p>Something better is to update <tt>W</tt> at each filtering step. You can also try to enforce various quantity during the iterations, for instance the volume of the
+            mesh.
+         </p>
+         <p>Instead of iterative filtering, one can solve for the heat diffusion flow.</p><pre class="codeinput">Tlist = [0 2 5 10 20 40]/4;
+options.dt = 0.3;
+options.face_vertex_color = [];
+clf;
+<span class="keyword">for</span> k=1:length(Tlist)
+    options.Tmax = Tlist(k);
+    vertex2 = perform_mesh_heat_diffusion(vertex1,faces,L,options);
+    subplot(2,3,k);
+    plot_mesh(vertex2,faces,options);
+    shading <span class="string">interp</span>; axis <span class="string">tight</span>;
+<span class="keyword">end</span>
+</pre><img vspace="5" hspace="5" src="content_08.png"> <p>You can try to select the optimal number of iterations for applying <tt>W</tt> or the optimal time for the heat equation so that to minimize the denoising error.
+         </p>
+         <h2>Mesh parameterization<a name="18"></a></h2>
+         <p>Mesh parameterization corresponds to the computation of a 2D position for each vertex of a 3D mesh, so that the 2D-&gt;3D mapping
+            is bijective.
+         </p>
+         <p>First load a small mesh and set up parameters</p><pre class="codeinput">name = <span class="string">'nefertiti'</span>; options.name = name;
+[vertex,faces] = read_mesh(name);
+A = triangulation2adjacency(faces);
+<span class="comment">% you can try with other boundary type</span>
+options.boundary = <span class="string">'circle'</span>;
+<span class="comment">% you can try with other Laplacians</span>
+options.laplacian = <span class="string">'conformal'</span>;
+</pre><p>The fixed boundary parameterization is guaranteed to be valid is the mesh is homeomorphic to a disk and if the boundary of
+            the planar domain is convex. This is the Tutte embedding theorem.
+         </p><pre class="codeinput"><span class="comment">% compute the layout in 2D</span>
+options.method = <span class="string">'parameterization'</span>;
+options.verb = 0;
+xy = compute_parameterization(vertex,faces,options);
+<span class="comment">% display the parameterization</span>
+clf;
+subplot(1,2,1);
+plot_mesh(vertex,faces,options); shading <span class="string">faceted</span>; axis <span class="string">tight</span>;
+subplot(1,2,2);
+plot_graph(A,xy,<span class="string">'k.-'</span>); axis <span class="string">tight</span>;
+title(<span class="string">'Parameterization'</span>);
+</pre><img vspace="5" hspace="5" src="content_09.png"> <p>In order to reduct the distortion, it is possible to relax the boundary condition and sovle for a Neumann boundary condition.
+            The parameterization is not guaranteed to be valid anymore.
+         </p><pre class="codeinput"><span class="comment">% compute the parameterization</span>
+options.method = <span class="string">'freeboundary'</span>;
+xy1 = compute_parameterization(vertex,faces,options);
+<span class="comment">% display the parameterization</span>
+clf;
+subplot(1,2,1);
+plot_graph(A,xy,<span class="string">'k.-'</span>); axis <span class="string">tight</span>;
+title(<span class="string">'Fixed boundary'</span>);
+subplot(1,2,2);
+plot_graph(A,xy1,<span class="string">'k.-'</span>); axis <span class="string">tight</span>;
+title(<span class="string">'Free boundary'</span>);
+</pre><img vspace="5" hspace="5" src="content_10.png"> <p>Another option is to use dimensionality reduction technics, for instance Laplacian eigenmaps (first eigenvectors of the laplacian)
+            or Isomap (geodesic distances computations).
+         </p><pre class="codeinput"><span class="comment">% perform dimensionality reduction</span>
+options.method = <span class="string">'flattening'</span>;
+xy2 = compute_parameterization(vertex,faces,options);
+options.method = <span class="string">'isomap'</span>;
+xy3 = compute_parameterization(vertex,faces,options);
+<span class="comment">% display</span>
+clf;
+subplot(1,2,1);
+plot_graph(A,xy2,<span class="string">'k.-'</span>); axis <span class="string">tight</span>;
+title(<span class="string">'Laplacian eigenmaps'</span>);
+subplot(1,2,2);
+plot_graph(A,xy3,<span class="string">'k.-'</span>); axis <span class="string">tight</span>;
+title(<span class="string">'Isomap'</span>);
+</pre><img vspace="5" hspace="5" src="content_11.png"> <h2>Tetrahedral Mesh Loading and Displaying<a name="23"></a></h2>
+         <p>You can load and display volumetric tetrahedral meshes. Important: .tet files and <b>not</b> included in the toolbox distribution (too large files). You should download them from
+         </p>
+         <p><a href="http://www.aimatshape.net/">http://www.aimatshape.net/</a></p><pre class="codeinput">[vertex,face] = read_tet(<span class="string">'../toolbox_graph_data/tet/hand.tet'</span>);
+clf;
+plot_mesh(vertex,face,options);
+</pre><img vspace="5" hspace="5" src="content_12.png"> <p class="footer"><br>
+            Copyright  &reg; 2008 Gabriel Peyre<br></p>
+      </div>
+      <!--
+##### SOURCE BEGIN #####
+%% Toolbox graph - A toolbox to process graph and triangulated meshes
+%
+% Copyright (c) 2008 Gabriel Peyre
+%
+
+%% 
+% The toolbox can be downloaded from Matlab Central
+% http://www.mathworks.com/matlabcentral/fileexchange/loadFile.do?objectId=5355&objectType=FILE
+
+
+%% 
+% First add to the path additional scripts.
+path(path, 'toolbox/');
+path(path, 'off/');
+clear options;
+
+%% 3D Mesh Loading and Displaying
+% A 3D mesh is composed of a |vertex| array of size |(3,n)| that contains
+% the position in 3D (or sometimes 2D) of the vertices, and a |face| array
+% of dimension |(3,m)| that contains the indexes of each triangulated face.
+
+% load the mesh
+name = 'elephant-50kv';
+options.name = name; % useful for displaying
+[vertex,faces] = read_mesh(name);
+% display the mesh 
+clf;
+plot_mesh(vertex, faces);
+shading interp;
+
+%%
+% You can zoom on the mesh and display its triangulated faces
+clf;
+for i=1:4
+    subplot(2,2,i);
+    plot_mesh(vertex, faces);
+    shading faceted;
+    zoom(1.8^(i+1));
+end
+
+%%
+% You can compute the normal to the mesh, and displace the position of the
+% vertices along the normal.
+
+options.face_vertex_color =  [];
+vertex1 = perform_normal_displacement(vertex,faces,.03);
+
+clf;
+subplot(1,2,1);
+plot_mesh(vertex,faces,options); shading interp; axis tight;
+subplot(1,2,2);
+plot_mesh(vertex1,faces,options); shading interp; axis tight;
+
+
+%% Differential Calculus on 3D Mesh
+% You can compute matrix (sparse) of differential and averaging operators
+% on 3D meshes. You can also compute curvature and normals.
+
+%%
+% You can compute normals and display them.
+
+% load a mesh
+name = 'mushroom';
+options.name = name; % useful for displaying
+[vertex,faces] = read_mesh(name);
+% compute normal per vertex and per face
+[normal,normalf] = compute_normal(vertex,faces);
+% display
+options.normal = normal;
+clf; plot_mesh(vertex,faces,options); shading interp; axis tight;
+options.normal = [];
+
+%%
+% You can compute curvature quantities using local avergaging and PCA
+% analysis.
+
+% load the mesh
+name = 'elephant-50kv';
+options.name = name; % useful for displaying
+[vertex,faces] = read_mesh(name);
+% compute the curvature
+options.curvature_smoothing = 10;
+options.verb = 0;
+[Umin,Umax,Cmin,Cmax,Cmean,Cgauss,Normal] = compute_curvature(vertex,faces,options);
+% display
+clf;
+subplot(1,2,1);
+options.face_vertex_color = perform_saturation(Cgauss,1.2);
+plot_mesh(vertex,faces, options); shading interp; colormap jet(256);
+title('Gaussian curvature');
+subplot(1,2,2);
+options.face_vertex_color = perform_saturation(abs(Cmin)+abs(Cmax),1.2);
+plot_mesh(vertex,faces, options); shading interp; colormap jet(256);
+title('Total curvature');
+
+
+
+%%
+% A laplacian is an high pass operator that compute second order
+% derivatives.
+
+name = 'elephant-50kv';
+options.name = name; % useful for displaying
+[vertex,faces] = read_mesh(name);
+% options for the Laplacians
+laplacian_type = 'conformal'; % slow to compute
+laplacian_type = 'combinatorial'; % fast, but inexact
+laplacian_type = 'distance'; % fast and more accurate
+% compute a normalized Laplacian
+options.symmetrize = 0;
+options.normalize = 1;
+L = compute_mesh_laplacian(vertex,faces,laplacian_type,options);
+% compute a non normalized Laplacian
+options.symmetrize = 0;
+options.normalize = 1;
+L0 = compute_mesh_laplacian(vertex,faces,laplacian_type,options);
+
+%%
+% Compute and display some eigenvectors of the Laplacian. They are the
+% equivalent of the Fourier sinusoids on surfaces.
+
+
+% compute a few eigenmodes
+nb = 60;
+opts.disp = 0; 
+[V,D] = eigs(L0,nb,'SM',opts); % warning : it takes lot of time
+V = real(V(:,end:-1:1));
+% display them on the mesh
+ilist = round(linspace(3,nb-3, 6));
+tau=2.2; % saturation for display
+clf;
+for i=1:length(ilist)
+    % subplot(1,length(ilist),i);
+    v = real(V(:,ilist(i)));
+    v = clamp( v/std(v),-tau,tau );
+    options.face_vertex_color = v;
+    subplot(2,3,i);
+    plot_mesh(vertex,faces,options);
+    shading interp; camlight; axis tight; % zoom(zoomf);
+    colormap jet(256);
+end
+
+
+
+%% Mesh Filtering
+% You can filter a mesh by applying a filter operator, or iterating several
+% time the filtering, which corresponds to the resolution of the heat
+% equation on the mesh
+
+%%
+% First we create a noisy mesh by displacement of the vertices along the
+% normal direction (those are the most distructive displacements).
+
+normals = compute_normal(vertex,faces);
+rho = randn(1,size(vertex,2))*.02;
+vertex1 = vertex + repmat(rho,3,1).*normals;
+
+%%
+% Then we compute a filtering operator (low pass)
+
+% parameters for the operator
+laplacian_type = 'distance';
+options.symmetrize = 0;
+options.normalize = 1; % it must be normalized for filtering
+options.verb = 0;
+W = compute_mesh_weight(vertex,faces,laplacian_type,options);
+% This is the corresponding laplacian
+L = compute_mesh_laplacian(vertex,faces,laplacian_type,options);
+
+%%
+% We apply iteratively the operator to get filtered versions of the mesh.
+
+vertex2 = vertex1;
+clf;
+options.face_vertex_color = [];
+for i=1:6
+    subplot(2,3,i);
+    plot_mesh(vertex2,faces,options); axis tight; shading interp;  
+    vertex2 = (W*(W*vertex2'))';  
+end
+
+%%
+% Something better is to update |W| at each filtering step. You can also
+% try to enforce various quantity during the iterations, for instance the
+% volume of the mesh.
+
+
+%% 
+% Instead of iterative filtering, one can solve for the heat diffusion
+% flow.
+
+Tlist = [0 2 5 10 20 40]/4;
+options.dt = 0.3;
+options.face_vertex_color = [];
+clf;
+for k=1:length(Tlist)
+    options.Tmax = Tlist(k);
+    vertex2 = perform_mesh_heat_diffusion(vertex1,faces,L,options);
+    subplot(2,3,k);
+    plot_mesh(vertex2,faces,options);
+    shading interp; axis tight;
+end
+
+%%
+% You can try to select the optimal number of iterations for applying |W| or
+% the optimal time for the heat equation so that to minimize the denoising
+% error. 
+
+%% Mesh parameterization
+% Mesh parameterization corresponds to the computation of a 2D position for
+% each vertex of a 3D mesh, so that the 2D->3D mapping is bijective.
+
+%% 
+% First load a small mesh and set up parameters
+
+name = 'nefertiti'; options.name = name;
+[vertex,faces] = read_mesh(name);
+A = triangulation2adjacency(faces);
+% you can try with other boundary type
+options.boundary = 'circle';
+% you can try with other Laplacians
+options.laplacian = 'conformal';
+
+%%
+% The fixed boundary parameterization is guaranteed to be valid is the mesh
+% is homeomorphic to a disk and if the boundary of the planar domain is
+% convex. This is the Tutte embedding theorem.
+
+% compute the layout in 2D
+options.method = 'parameterization';
+options.verb = 0;
+xy = compute_parameterization(vertex,faces,options);
+% display the parameterization
+clf;
+subplot(1,2,1);
+plot_mesh(vertex,faces,options); shading faceted; axis tight;
+subplot(1,2,2);
+plot_graph(A,xy,'k.-'); axis tight;
+title('Parameterization');
+
+
+%% 
+% In order to reduct the distortion, it is possible to relax the boundary
+% condition and sovle for a Neumann boundary condition. The
+% parameterization is not guaranteed to be valid anymore.
+
+
+% compute the parameterization
+options.method = 'freeboundary';
+xy1 = compute_parameterization(vertex,faces,options);
+% display the parameterization
+clf;
+subplot(1,2,1);
+plot_graph(A,xy,'k.-'); axis tight;
+title('Fixed boundary');
+subplot(1,2,2);
+plot_graph(A,xy1,'k.-'); axis tight;
+title('Free boundary');
+
+%%
+% Another option is to use dimensionality reduction technics, for instance
+% Laplacian eigenmaps (first eigenvectors of the laplacian) or Isomap
+% (geodesic distances computations).
+
+
+% perform dimensionality reduction
+options.method = 'flattening';
+xy2 = compute_parameterization(vertex,faces,options);
+options.method = 'isomap';
+xy3 = compute_parameterization(vertex,faces,options);
+% display
+clf;
+subplot(1,2,1);
+plot_graph(A,xy2,'k.-'); axis tight;
+title('Laplacian eigenmaps');
+subplot(1,2,2);
+plot_graph(A,xy3,'k.-'); axis tight;
+title('Isomap');
+
+
+%% Tetrahedral Mesh Loading and Displaying
+% You can load and display volumetric tetrahedral meshes.
+% Important: .tet files and *not* included in the toolbox distribution (too
+% large files). You should download them from 
+
+%%
+% http://www.aimatshape.net/
+
+[vertex,face] = read_tet('../toolbox_graph_data/tet/hand.tet');
+clf;
+plot_mesh(vertex,face,options);
+
+
+
+
+
+##### SOURCE END #####
+-->
+   </body>
+</html>

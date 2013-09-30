@@ -1,0 +1,175 @@
+
+<!DOCTYPE html
+  PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html><head>
+      <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+   <!--
+This HTML is auto-generated from an M-file.
+To make changes, update the M-file and republish this document.
+      --><title>Basis Pursuit Denoising with Forward-Backward</title><meta name="generator" content="MATLAB 7.10"><meta name="date" content="2010-12-29"><meta name="m-file" content="test_l1_lagrangian"><style type="text/css">
+
+body {
+  background-color: white;
+  margin:10px;
+}
+
+h1 {
+  color: #990000; 
+  font-size: x-large;
+}
+
+h2 {
+  color: #990000;
+  font-size: medium;
+}
+
+/* Make the text shrink to fit narrow windows, but not stretch too far in 
+wide windows. */ 
+p,h1,h2,div.content div {
+  max-width: 600px;
+  /* Hack for IE6 */
+  width: auto !important; width: 600px;
+}
+
+pre.codeinput {
+  background: #EEEEEE;
+  padding: 10px;
+}
+@media print {
+  pre.codeinput {word-wrap:break-word; width:100%;}
+} 
+
+span.keyword {color: #0000FF}
+span.comment {color: #228B22}
+span.string {color: #A020F0}
+span.untermstring {color: #B20000}
+span.syscmd {color: #B28C00}
+
+pre.codeoutput {
+  color: #666666;
+  padding: 10px;
+}
+
+pre.error {
+  color: red;
+}
+
+p.footer {
+  text-align: right;
+  font-size: xx-small;
+  font-weight: lighter;
+  font-style: italic;
+  color: gray;
+}
+
+  </style></head><body><div class="content"><h1>Basis Pursuit Denoising with Forward-Backward</h1><p>Test the use of Forward-backward-like splitting for the resolution of a compressed sensing regularization.</p><pre class="codeinput">addpath(<span class="string">'../'</span>);
+addpath(<span class="string">'../toolbox/'</span>);
+</pre><p>Dimension of the problem.</p><pre class="codeinput">n = 600;
+p = n/4;
+</pre><p>Regularization parameter.</p><pre class="codeinput">lambda = 1;
+</pre><p>Matrix and observation.</p><pre class="codeinput">A = randn(p,n);
+y = randn(p,1);
+</pre><p>List of benchmarked algorithms.</p><pre class="codeinput">methods = {<span class="string">'fb'</span>, <span class="string">'fista'</span>, <span class="string">'nesterov'</span>};
+</pre><p>operator callbacks</p><pre class="codeinput">F = @(x)lambda*norm(x,1);
+G = @(x)1/2*norm(y-A*x)^2;
+</pre><p>Proximal operator of F.</p><pre class="codeinput">ProxF = @(x,tau)perform_soft_thresholding(x,lambda*tau);
+</pre><p>Gradient operator of G.</p><pre class="codeinput">GradG = @(x)A'*(A*x-y);
+</pre><p>Lipschitz constant.</p><pre class="codeinput">L = norm(A)^2;
+</pre><p>Function to record the energy.</p><pre class="codeinput">options.report = @(x)F(x)+G(x);
+</pre><p>Bench the algorithm</p><pre class="codeinput">options.niter = 5000;
+E = [];
+<span class="keyword">for</span> i=1:length(methods)
+    options.method = methods{i};
+    [x,e] = perform_fb(zeros(n,1), ProxF, GradG, L, options);
+    E(:,i) = e(:);
+<span class="keyword">end</span>
+e = min(E(:));
+</pre><pre class="codeoutput">[********************]
+[********************]
+[********************]
+</pre><p>Display the decays of the energies.</p><p><i>IMPORTANT:</i> Note that the comparison with Nesterov is unfair, since each Nesterov iteration cost twice more.</p><pre class="codeinput">sel = 1:round(options.niter/10);
+loglog(E(sel,:)-e);
+axis <span class="string">tight</span>;
+legend(methods);
+</pre><img vspace="5" hspace="5" src="test_l1_lagrangian_01.png" alt=""> <p class="footer"><br>
+      Published with MATLAB&reg; 7.10<br></p></div><!--
+##### SOURCE BEGIN #####
+%% Basis Pursuit Denoising with Forward-Backward
+% Test the use of Forward-backward-like splitting for the resolution
+% of a compressed sensing regularization.
+
+addpath('../');
+addpath('../toolbox/');
+
+%%
+% Dimension of the problem.
+
+n = 600;
+p = n/4;
+
+%%
+% Regularization parameter.
+
+lambda = 1;
+
+%%
+% Matrix and observation.
+
+A = randn(p,n);
+y = randn(p,1);
+
+%%
+% List of benchmarked algorithms.
+
+methods = {'fb', 'fista', 'nesterov'};
+
+%%
+% operator callbacks
+
+F = @(x)lambda*norm(x,1);
+G = @(x)1/2*norm(y-A*x)^2;
+
+%%
+% Proximal operator of F. 
+
+ProxF = @(x,tau)perform_soft_thresholding(x,lambda*tau);
+
+%%
+% Gradient operator of G.
+GradG = @(x)A'*(A*x-y);
+
+%%
+% Lipschitz constant.
+
+L = norm(A)^2;
+
+%%
+% Function to record the energy.
+
+options.report = @(x)F(x)+G(x);
+
+%%
+% Bench the algorithm
+
+options.niter = 5000;
+E = [];
+for i=1:length(methods)
+    options.method = methods{i};
+    [x,e] = perform_fb(zeros(n,1), ProxF, GradG, L, options);
+    E(:,i) = e(:);
+end
+e = min(E(:));
+
+%%
+% Display the decays of the energies.
+
+%%
+% _IMPORTANT:_ Note that the comparison with Nesterov is unfair, since each
+% Nesterov iteration cost twice more. 
+
+sel = 1:round(options.niter/10);
+loglog(E(sel,:)-e);
+axis tight;
+legend(methods);
+##### SOURCE END #####
+--></body></html>

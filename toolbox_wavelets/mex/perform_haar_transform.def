@@ -1,0 +1,3 @@
+LIBRARY perform_haar_transform.dll
+EXPORTS
+	mexFunction
